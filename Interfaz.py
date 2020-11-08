@@ -5,6 +5,9 @@ import os
 from shutil import rmtree
 import cv2
 from PIL import Image, ImageTk
+import glob
+import imutils
+import numpy as np 
 
 # Se crea la ventana 
 ventana = Tk()
@@ -49,37 +52,121 @@ def show_frame():
        lmain.configure(image=imgtk)
        lmain.after(10, show_frame)
 
+# Se crea una funcion para ingresar a una persona nueva
+def nuevoIntegrante():
+   pass
+
+
 # Se crea una funcion para ingresar los datos de una persona nueva
 def agregar():
+    # Variables Globales
     global lmain
-    formulario = Toplevel() # Se crear una nueva 
+    global camara_interfaz
+    camara_interfaz = False
+    # Se crear una nueva ventana 
+    formulario = Toplevel() 
     formulario.title("Agregar usuario nuevo")
     formulario.config(bg = "#A8CBEF")
+    # Se agregan los label y la entrada de texto
     texto = Label(formulario, text = "Ingrese los datos", bg = "#A8CBEF").pack(pady=15)
-    nombre = Entry(formulario, width=30, borderwidth=5).pack()
+    ingrese_nombre = Label(formulario, text = "Ingrese el nombre", bg = "#A8CBEF").pack()
+    nombre = Entry(formulario, width = 30, borderwidth=5)
+    nombre.pack()
+    # Se agrega la webcam
     lmain = Label(formulario)
     lmain.pack(pady=10)
-    buton_guardar = Button(formulario,text = "Capturar Rostro", bg = "#A2ABB5", borderwidth=4, width = 20, height = 1).pack()
-    buton_entrenar = Button(formulario,text = "Actualizar Datos", bg = "#A2ABB5", borderwidth=4, width = 20, height = 1).pack(pady=10)
-    show_frame()
+    # Funcion para guardar y capturar rostros
+    def capturarRostro():
+        obtener_directorio = os.getcwd() # Obtiene el directorio donde esta el programa
+        directorio = obtener_directorio + "/Personas" # Cambia al directorio final
+        carpetaPersona = directorio + '/' + nombre.get()
+        if not os.path.exists(carpetaPersona):
+            print('Carpeta creada: ', carpetaPersona)
+            os.makedirs(carpetaPersona)
+
+        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+        clasificadorRostros = cv2.CascadeClassifier(cv2.data.haarcascades+'haarcascade_frontalface_default.xml')
+        contador = len(glob.glob(carpetaPersona + "/*.jpg"))
+        final = contador + 300
+        while True:
+            ret, frame = cap.read()
+            if ret == False: break
+            frame = imutils.resize(frame, width=640)
+            gris = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            auxFrame = frame.copy()
+
+            caras = clasificadorRostros.detectMultiScale(gris,1.3,5)
+
+            for (x,y,w,h) in caras:
+                cv2.rectangle(frame, (x,y), (x+w,+h), (255,0,0), 2)
+                rostro = auxFrame[y:y+h,x:x+w]
+                rostro = cv2.resize(rostro,(300,300),interpolation=cv2.INTER_CUBIC)
+                cv2.imwrite(carpetaPersona + '/rostro_{}.jpg'.format(contador),rostro)
+                contador = contador + 1
+            cv2.imshow('frame', frame)    
+
+            k = cv2.waitKey(1)
+            if k == 27 or contador >= final:
+                break
+
+        cap.release()
+        cv2.destroyAllWindows()
+
+    # Funcion para entrenar a la red
+    def entrenar():
+        obtener_directorio = os.getcwd() # Obtiene el directorio donde esta el programa
+        directorio = obtener_directorio + "/Personas" # Cambia al directorio final
+        listaPersonas = os.listdir(directorio)
+
+        labels = []
+        facesData = []
+        label = 0
+
+        for nombreDir in listaPersonas:
+            personPath = directorio + '/' + nombreDir
+            print('Leyendo las iamgenes')
+
+            for nombreArchivo in os.listdir(personPath):
+                print('Rostros: ', nombreDir + '/' + nombreArchivo)
+                labels.append(label)
+                facesData.append(cv2.imread(personPath+'/'+ nombreArchivo,0))
+                imagen = cv2.imread(personPath+'/'+ nombreArchivo,0)
+
+            label = label + 1
+
+        reconocimiento_rostro = cv2.face.EigenFaceRecognizer_create()
+
+        # Entrenamiento reconocedor de rostros
+        print('Entrenando...')    
+        reconocimiento_rostro.train(facesData,np.array(labels))
+
+        # Almacenar el entrenamiento
+        reconocimiento_rostro.write('modeloEigenFace.xml')
+        print('Modelo almacenado...')
+
+    
+    # se
+    buton_guardar = Button(formulario,text = "Capturar Rostro", bg = "#A2ABB5", borderwidth=4, width = 20, height = 1, command = capturarRostro).pack()
+    buton_entrenar = Button(formulario,text = "Actualizar Datos", bg = "#A2ABB5", borderwidth=4, width = 20, height = 1, command = entrenar).pack(pady=10)
+    if (camara_interfaz == True):
+        show_frame()
     
 
 # Se crea funcion para eliminar carpetas
 def eliminar():
-    directorio = os.getcwd() # Obtiene el directorio donde esta el programa
-    directorio_nuevo = directorio.replace("\ ", "/") # Cambia las diagonale para que python las pueda leer
-    directorio_final = directorio + "/Usuarios" # Cambia al directorio final
+    obtener_directorio = os.getcwd() # Obtiene el directorio donde esta el programa
+    directorio = obtener_directorio + "/Personas" # Cambia al directorio final
     # Codigo que elimina la carpeta que ha sido seleccionada en el cuadro de dialogo
-    usuario = filedialog.askdirectory(initialdir=directorio_final, title="Selecciona una carpeta")
+    usuario = filedialog.askdirectory(initialdir=directorio, title="Selecciona una carpeta")
     carpeta = usuario
     rmtree(carpeta)
    
 
 # Se crean los botones para la pestaña Editar
-boton_agregar = Button(editar, text = "Agregar Usuario", bg = "#A2ABB5", borderwidth=4, width = 15, height = 1,command = agregar)
+boton_agregar = Button(editar, text = "Agregar", bg = "#A2ABB5", borderwidth=4, width = 15, height = 1,command = agregar)
 boton_agregar.pack(pady=15)
 
-boton_eliminar = Button(editar, text = "Eliminar Usuario", bg = "#A2ABB5", borderwidth=4, width = 15, height = 1,command = eliminar)
+boton_eliminar = Button(editar, text = "Eliminar", bg = "#A2ABB5", borderwidth=4, width = 15, height = 1,command = eliminar)
 boton_eliminar.pack(pady=15)
 
 ventana.mainloop()
