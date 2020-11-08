@@ -8,7 +8,8 @@ import cv2
 from PIL import Image, ImageTk
 import glob
 import imutils
-import numpy as np 
+import numpy as np
+import time 
 
 '''
 En esta parte iran todas las funciones necesarias para que los botones principales de las pestañas puedan funcionar
@@ -71,6 +72,16 @@ def iniciarPrograma():
                 cv2.putText(frame, '{}'.format(imagePaths[resultado[0]]), (x,y-25),1,1.3,(0,255,0),1,cv2.LINE_AA)
                 cv2.rectangle(frame, (x,y), (x+w,y+h), (255,0,0), 2)
             else:
+                personaDesconocida = frame.copy()
+                carpetaDesconocido = direccionCarpeta + '/Desconocido'
+                if not os.path.exists(carpetaDesconocido):
+                    print('Carpeta creada: ', carpetaDesconocido)
+                    os.makedirs(carpetaDesconocido)
+                
+                contador = len(glob.glob(carpetaDesconocido + "/*.jpg"))
+                
+                cv2.imwrite(carpetaDesconocido + '/rostro_{}.jpg'.format(contador),personaDesconocida)
+
                 cv2.putText(frame, 'Desconocido', (x,y-20),1,0.8,(0,0,255),1,cv2.LINE_AA)
                 cv2.rectangle(frame, (x,y), (x+w,y+h), (0,0,255), 2)
 
